@@ -3,7 +3,7 @@ This is my academic project and it is best demonstration of Machine learning ski
 
 # Explainable Fraud Detection System using Machine Learning
 
-This project presents a complete, end-to-end system for detecting fraudulent financial transactions using a machine learning model that is both highly accurate and fully explainable. The system is built using a Python-based stack and features a back-end API that serves the model and a user-friendly web interface for interaction and demonstration.
+This project presents a complete, end-to-end system for detecting fraudulent financial transactions using a machine learning model that is both highly accurate and fully explainable. The system is built using a Python-based stack and features a back-end API that serves the model and a user-friendly web interface for interaction and demonstration. An alternative, simplified deployment method using a single Streamlit application is also provided.
 
 The core of the project is an XGBoost classifier trained on the PaySim dataset from Kaggle. A key focus of this work was to build a system under realistic data constraints, meaning it does not rely on private recipient information. Its high performance is achieved through advanced feature engineering and a focus on model interpretability using SHAP.
 
@@ -14,11 +14,16 @@ The core of the project is an XGBoost classifier trained on the PaySim dataset f
 -   **Explainable AI (XAI):** The system is not a "black box." By integrating SHAP, we can prove *why* the model makes its decisions, making it transparent and trustworthy.
 -   **Interactive Web UI:** A user-friendly front-end built with Streamlit allows for easy manual transaction checks and live demonstrations.
 -   **Comprehensive Simulation:** The UI includes a multi-scenario simulation that demonstrates the system's ability to detect various fraud patterns, including velocity attacks and account takeovers.
--   **API-Based Architecture:** The machine learning model is served via a robust Flask API, separating the model logic from the user interface and allowing for easy integration.
+-   **API-Based Architecture (Primary):** The machine learning model is served via a robust Flask API, separating the model logic from the user interface and allowing for easy integration.
+-   **Simplified Streamlit Deployment (Alternative):** An option to run the entire application as a single Streamlit script, embedding model loading and prediction directly within the UI.
 
 ## System Architecture
 
-The application operates on a simple but robust client-server architecture:
+The application offers two deployment options:
+
+### 1. Flask API + Streamlit UI (Original Architecture)
+
+This operates on a client-server architecture:
 
 1.  **Back-End (Flask API):**
     -   Loads the pre-trained Isolation Forest and XGBoost models.
@@ -36,6 +41,23 @@ The application operates on a simple but robust client-server architecture:
 |  Streamlit UI  | <--> |      Flask API      | <--> |  ML Models (joblib)  |
 | (app_ui.py)    |      | (app.py)            |      | (XGBoost, IsoForest) |
 +----------------+      +---------------------+      +----------------------+
+```
+
+### 2. Streamlit-Only Deployment (Simplified Architecture)
+
+In this setup, the Streamlit application directly loads the machine learning models and performs predictions, eliminating the need for a separate Flask API.
+
+```
++-------------------------------------------------+
+|             Streamlit UI (app_ui.py)            |
+|  (Loads ML Models directly, performs prediction)|
++-------------------------------------------------+
+      |                                 |
+      V                                 V
++----------------------+      +----------------------+
+|  ML Models (joblib)  |      |  ML Models (joblib)  |
+| (XGBoost, IsoForest) |      | (XGBoost, IsoForest) |
++----------------------+      +----------------------+
 ```
 
 ## Methodology Workflow
@@ -60,7 +82,7 @@ The 99% recall proves the model's effectiveness. The lower precision is an accep
 
 ## Technologies Used
 
--   **Back-End:** Python, Flask
+-   **Back-End:** Python, Flask (for original architecture)
 -   **Machine Learning:** Pandas, Scikit-learn, XGBoost, SHAP
 -   **Front-End:** Streamlit
 -   **Data Analysis:** Jupyter Notebook (or Google Colab)
@@ -75,7 +97,13 @@ The 99% recall proves the model's effectiveness. The lower precision is an accep
 │   └── isolation_forest_model.joblib # The trained Isolation Forest model
 │
 ├── fraud_ui/
-│   └── app_ui.py               # The Streamlit UI application
+│   └── app_ui.py               # The Streamlit UI application (connects to Flask API)
+│
+├── streamlit_deployment/
+│   ├── app_ui.py               # The Streamlit UI application (standalone, loads models directly)
+│   ├── final_fraud_model.joblib  # Copy of the trained XGBoost model
+│   ├── isolation_forest_model.joblib # Copy of the trained Isolation Forest model
+│   └── requirements.txt        # Dependencies for Streamlit-only deployment
 │
 ├── notebook/
 │   └── Fraud_Detection_Analysis.ipynb  # Your analysis notebook (optional)
@@ -99,9 +127,12 @@ The 99% recall proves the model's effectiveness. The lower precision is an accep
     ```
 
 3.  **Install the required packages:**
-    Create a `requirements.txt` file with the following content and run `pip install -r requirements.txt`.
+    The required packages depend on which deployment method you choose.
 
-    **`requirements.txt`:**
+    ### For Flask API + Streamlit UI Deployment:
+    Create a `requirements.txt` file in your project root (or use the one in `fraud_api` and `fraud_ui` if they exist) with the following content and run `pip install -r requirements.txt`.
+
+    **`requirements.txt` (for Flask API + Streamlit UI):**
     ```
     flask
     pandas
@@ -111,7 +142,28 @@ The 99% recall proves the model's effectiveness. The lower precision is an accep
     requests
     ```
 
+    ### For Streamlit-Only Deployment:
+    Navigate to the `streamlit_deployment` directory and install its specific requirements.
+
+    **`streamlit_deployment/requirements.txt`:**
+    ```
+    pandas
+    scikit-learn
+    xgboost
+    streamlit
+    ```
+    Then run:
+    ```bash
+    cd streamlit_deployment
+    pip install -r requirements.txt
+    cd .. # Go back to project root if needed
+    ```
+
 ## How to Run the Application
+
+You have two options for running the application:
+
+### Option 1: Flask API + Streamlit UI (Original Architecture)
 
 This system requires two terminals running simultaneously.
 
@@ -127,6 +179,24 @@ This system requires two terminals running simultaneously.
     Open a **second** terminal, navigate to the `fraud_ui` directory, and run:
     ```bash
     cd fraud_ui
+    streamlit run app_ui.py
+    ```
+    This will automatically open a new tab in your web browser with the user interface, usually at `http://localhost:8501`.
+
+### Option 2: Streamlit-Only Deployment (Simplified Architecture)
+
+This method runs the entire application from a single Streamlit script.
+
+1.  **Navigate to the `streamlit_deployment` directory:**
+    ```bash
+    cd streamlit_deployment
+    ```
+
+2.  **Ensure model files are present:**
+    Make sure `isolation_forest_model.joblib` and `final_fraud_model.joblib` are copied into the `streamlit_deployment` directory.
+
+3.  **Run the Streamlit application:**
+    ```bash
     streamlit run app_ui.py
     ```
     This will automatically open a new tab in your web browser with the user interface, usually at `http://localhost:8501`.
