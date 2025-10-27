@@ -87,8 +87,9 @@ The 99% recall proves the model's effectiveness. The lower precision is an accep
 
 1.  **Clone the repository:**
     ```bash
-    git clone <your-repository-url>
-    cd <your-repository-name>
+    git clone https://github.com/agp-369/Fraud-Detection-Using-Machine-Learning.git
+    cd Fraud-Detection-Using-Machine-Learning
+
     ```
 
 2.  **Create a virtual environment (recommended):**
