@@ -19,8 +19,12 @@ st.set_page_config(
 # -----------------------------------------------------------
 @st.cache_resource
 def load_models():
-    iso_forest_model = joblib.load('isolation_forest_model.joblib')
-    xgb_model = joblib.load('final_fraud_model.joblib')
+    import os
+
+    MODEL_DIR = os.path.dirname(__file__)
+    iso_forest_model = joblib.load(os.path.join(MODEL_DIR, 'isolation_forest_model.joblib'))
+    xgb_model = joblib.load(os.path.join(MODEL_DIR, 'final_fraud_model.joblib'))
+
     return iso_forest_model, xgb_model
 
 iso_forest_model, xgb_model = load_models()
