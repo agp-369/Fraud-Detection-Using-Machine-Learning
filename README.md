@@ -134,4 +134,6 @@ This system requires two terminals running simultaneously.
 
 You can now use the web interface to check transactions manually or run the comprehensive simulation to see the hybrid detection system in action.
 
-![Screenshot of the Application UI](screenshot.png)
+![Screenshot of the Application UI](<img width="1800" height="850" alt="Screenshot2" src="https://github.com/user-attachments/assets/739f748b-2289-4df1-aad6-4dfb16f0e7c4" />
+
+<img width="1863" height="919" alt="Screenshot1" src="https://github.com/user-attachments/assets/48f664fc-dde8-4040-89dd-e09c253ed980" />)
