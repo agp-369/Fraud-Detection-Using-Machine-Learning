@@ -4,12 +4,15 @@ import pandas as pd
 import numpy as np
 import time
 from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
+import shap
+import os
 
 # -----------------------------------------------------------
 # ✅ Streamlit Page Configuration (MUST be first Streamlit command)
 # -----------------------------------------------------------
 st.set_page_config(
-    page_title="Final Fraud Detection System",
+    page_title="Hybrid Fraud Detection System",
     page_icon="🏆",
     layout="wide"
 )
@@ -19,15 +22,13 @@ st.set_page_config(
 # -----------------------------------------------------------
 @st.cache_resource
 def load_models():
-    import os
-
     MODEL_DIR = os.path.dirname(__file__)
     iso_forest_model = joblib.load(os.path.join(MODEL_DIR, 'isolation_forest_model.joblib'))
     xgb_model = joblib.load(os.path.join(MODEL_DIR, 'final_fraud_model.joblib'))
+    shap_explainer = joblib.load(os.path.join(MODEL_DIR, 'shap_explainer.joblib'))  # Load SHAP explainer
+    return iso_forest_model, xgb_model, shap_explainer
 
-    return iso_forest_model, xgb_model
-
-iso_forest_model, xgb_model = load_models()
+iso_forest_model, xgb_model, shap_explainer = load_models()
 
 # -----------------------------------------------------------
 # Core Prediction Function (replaces Flask API)
@@ -52,14 +53,34 @@ def predict_transaction(data):
         'time_since_last_transaction', 'type_CASH_OUT', 'type_TRANSFER'
     ]
 
-    # --- Stage 1: Isolation Forest ---
+    for col in all_features:
+        if col not in df.columns:
+            df[col] = 0
+
+    # --- STAGE 1: Isolation Forest ---
     iso_forest_pred = iso_forest_model.predict(df[all_features])
     if iso_forest_pred[0] == 1:
         return {'isFraud': 0, 'stage': 1, 'details': 'Passed initial anomaly scan.'}
 
-    # --- Stage 2: XGBoost ---
+    # --- STAGE 2: XGBoost ---
     xgb_prediction = xgb_model.predict(df[all_features])
-    return {'isFraud': int(xgb_prediction[0]), 'stage': 2, 'details': 'Flagged by anomaly scan and analyzed.'}
+
+    # --- SHAP Explanation for Stage 2 ---
+    shap_values = shap_explainer.shap_values(df[all_features])
+    if isinstance(shap_values, list):
+        shap_values_for_fraud = shap_values[1][0].tolist()
+    else:
+        shap_values_for_fraud = shap_values[0].tolist()
+
+    feature_names = df[all_features].columns.tolist()
+    shap_explanation = dict(zip(feature_names, shap_values_for_fraud))
+
+    return {
+        'isFraud': int(xgb_prediction[0]),
+        'stage': 2,
+        'details': 'Flagged by anomaly scan and analyzed.',
+        'shap_explanation': shap_explanation
+    }
 
 # -----------------------------------------------------------
 # Streamlit UI
@@ -67,15 +88,11 @@ def predict_transaction(data):
 if 'history' not in st.session_state:
     st.session_state.history = {}
 
-st.title("Final Fraud Detection System 🏆")
-st.write("A real-time detection engine with integrated per-user velocity checking and live simulation.")
+st.title("Hybrid Two-Stage Fraud Detection System 🏆")
+st.write("This system uses a two-stage process: a fast anomaly scan followed by a deep analysis for suspicious transactions.")
 st.markdown("---")
 
 col_input, col_history = st.columns([0.5, 0.5], gap="large")
-
-with col_history:
-    st.header("Live Transaction Log")
-    log_placeholder = st.empty()
 
 # -----------------------------------------------------------
 # Log Display Helper
@@ -99,6 +116,43 @@ def update_log_display(placeholder):
         history_df.index += 1
         placeholder.dataframe(history_df, use_container_width=True)
 
+with col_history:
+    st.header("Live Transaction Log")
+    log_placeholder = st.empty()
+
+# -----------------------------------------------------------
+# Function to display SHAP explanation
+# -----------------------------------------------------------
+def display_shap_explanation(shap_explanation_data):
+    if not shap_explanation_data:
+        st.info("No detailed explanation available for this transaction (passed Stage 1).")
+        return
+
+    st.subheader("Why this decision? (SHAP Explanation)")
+
+    shap_df = pd.DataFrame(list(shap_explanation_data.items()), columns=['Feature', 'SHAP Value'])
+    shap_df['Absolute SHAP Value'] = shap_df['SHAP Value'].abs()
+    shap_df = shap_df.sort_values(by='Absolute SHAP Value', ascending=False).head(5)
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    colors = ['red' if val > 0 else 'blue' for val in shap_df['SHAP Value']]
+    ax.barh(shap_df['Feature'], shap_df['SHAP Value'], color=colors)
+    ax.set_xlabel("SHAP Value (Impact on Model Output)")
+    ax.set_title("Top 5 Feature Contributions")
+    plt.tight_layout()
+    st.pyplot(fig)
+    plt.close(fig)
+
+    st.markdown(
+        """
+        <small>
+        <span style="color:red;">Red bars</span> indicate features pushing towards **FRAUD**.<br>
+        <span style="color:blue;">Blue bars</span> indicate features pushing towards **LEGITIMATE**.
+        </small>
+        """,
+        unsafe_allow_html=True
+    )
+
 # -----------------------------------------------------------
 # Input Form
 # -----------------------------------------------------------
@@ -109,7 +163,7 @@ with col_input:
         transaction_type = st.selectbox("Transaction Type", ["CASH_OUT", "TRANSFER"])
         amount = st.number_input("Amount (₹)", min_value=0.01, value=1000.0, format="%.2f")
         oldbalanceOrg = st.number_input("Current Balance (₹)", min_value=0.0, value=50000.0, format="%.2f")
-        step = st.number_input("Hour of Day (0-23)", min_value=0, max_value=23, value=10)
+        step = st.number_input("Hour of Day (0–23)", min_value=0, max_value=23, value=10)
 
         form_col1, form_col2 = st.columns(2)
         with form_col1:
@@ -120,6 +174,7 @@ with col_input:
     st.markdown("---")
     st.header("Prediction Result")
     result_placeholder = st.empty()
+    shap_explanation_placeholder = st.empty()
 
 update_log_display(log_placeholder)
 
@@ -132,6 +187,8 @@ def process_and_display(api_data, user_id, tx_type, amt, placeholder, is_simulat
         st.session_state.history[user_id] = []
     user_history = st.session_state.history[user_id]
     tx_in_last_minute = sum(1 for tx in user_history if now - tx['timestamp'] < timedelta(minutes=1))
+
+    shap_explanation_placeholder.empty()
 
     with placeholder.container():
         if is_simulation:
@@ -155,6 +212,7 @@ def process_and_display(api_data, user_id, tx_type, amt, placeholder, is_simulat
     if prediction_data is not None:
         prediction = prediction_data['isFraud']
         stage = prediction_data['stage']
+        shap_explanation = prediction_data.get('shap_explanation', None)
 
         st.session_state.history[user_id].append({
             "timestamp": now, "type": tx_type, "amount": amt,
@@ -163,18 +221,24 @@ def process_and_display(api_data, user_id, tx_type, amt, placeholder, is_simulat
         update_log_display(log_placeholder)
 
         with placeholder.container():
-            if stage == 1:
-                st.success("Stage 1 Result: Passed anomaly scan. Transaction is LEGITIMATE.", icon="✅")
-            else:
-                res_col1, res_col2 = st.columns([0.7, 0.3])
-                with res_col1:
+            st.subheader("Final Prediction")
+            res_col1, res_col2 = st.columns([0.7, 0.3])
+            with res_col1:
+                if stage == 1:
+                    st.success("Stage 1 Result: Passed anomaly scan. Transaction is LEGITIMATE.", icon="✅")
+                else:
+                    with st.spinner("Stage 2: Anomaly detected! Performing deep analysis..."):
+                        time.sleep(2)
                     if prediction == 1:
                         st.error("Stage 2 Result: Deep analysis confirmed transaction is FRAUDULENT.", icon="🚨")
                     else:
                         st.warning("Stage 2 Result: Anomaly found, but deep analysis confirmed it is LEGITIMATE.", icon="⚠️")
-                with res_col2:
-                    if tx_in_last_minute + 1 > 2:
-                        st.warning(f"**Velocity Alert:** {tx_in_last_minute + 1} tx/min", icon="⚠️")
+            with res_col2:
+                if tx_in_last_minute + 1 > 2:
+                    st.warning(f"**Velocity Alert:** {tx_in_last_minute + 1} tx/min", icon="⚠️")
+
+        if shap_explanation:
+            display_shap_explanation(shap_explanation)
 
 # -----------------------------------------------------------
 # Manual Submission Logic
