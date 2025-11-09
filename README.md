@@ -201,7 +201,7 @@ This method runs the entire application from a single Streamlit script.
     ```
     This will automatically open a new tab in your web browser with the user interface, usually at `http://localhost:8501`.
 ## Live Demo   
-Experience the Fraud Detection System live: [**Launch Streamlit App**](YOUR_STREAMLIT_APP_URL)
+Experience the Fraud Detection System live: [**Launch Streamlit App**]https://frauddetection-system.streamlit.app/
 ## Demonstration
 
 You can now use the web interface to check transactions manually or run the comprehensive simulation to see the hybrid detection system in action.
